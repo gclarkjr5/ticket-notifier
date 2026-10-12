@@ -18,7 +18,7 @@ jobs:
     name: just lint-rust
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: extractions/setup-just@v2
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -32,7 +32,7 @@ jobs:
     name: just lint-docker docker-build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: extractions/setup-just@v2
       - name: Install hadolint
         run: |
@@ -44,7 +44,7 @@ jobs:
     name: just lint-infra
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: extractions/setup-just@v2
       - uses: opentofu/setup-opentofu@v1
         with:
