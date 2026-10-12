@@ -39,7 +39,7 @@ GCP project: `ticket-notifier-511415`. Region: `europe-west4`.
 ## Hand over to GitHub Actions
 Push the repo to GitHub, then:
 ```sh
-just ci-vars     # sets GCP_WORKLOAD_IDENTITY_PROVIDER and GCP_DEPLOYER_SA repo variables
+just ci-vars     # sets the GCP_WORKLOAD_IDENTITY_PROVIDER and GCP_DEPLOYER_SA repo variables and lets the deployer use the state bucket
 gh secret set GOOGLE_CLIENT_ID
 gh secret set GOOGLE_CLIENT_SECRET
 gh secret set GOOGLE_REFRESH_TOKEN

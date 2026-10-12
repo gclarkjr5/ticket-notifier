@@ -77,10 +77,11 @@ plan: init
 deploy *args: _clean init
     tofu -chdir=infra apply -lock-timeout=300s -var image_tag={{tag}} {{args}}
 
-# after the first deploy: point GitHub Actions at the deployer identity (needs `gh` logged in)
+# after the first deploy: point GitHub Actions at the deployer identity and let it use the state bucket (needs `gh` logged in)
 ci-vars:
     gh variable set GCP_WORKLOAD_IDENTITY_PROVIDER --body "$(tofu -chdir=infra output -raw github_workload_identity_provider)"
     gh variable set GCP_DEPLOYER_SA --body "$(tofu -chdir=infra output -raw github_deployer_service_account)"
+    gcloud storage buckets add-iam-policy-binding gs://{{project}}-tfstate --member="serviceAccount:$(tofu -chdir=infra output -raw github_deployer_service_account)" --role=roles/storage.objectAdmin --project {{project}}
 
 # ---------------------------------------------------------------- operate
 

@@ -62,9 +62,6 @@ resource "google_project_iam_member" "deployer" {
   member   = "serviceAccount:${google_service_account.deployer.email}"
 }
 
-# Read/write the remote state (created outside OpenTofu by `just bootstrap`).
-resource "google_storage_bucket_iam_member" "deployer_state" {
-  bucket = "${var.project_id}-tfstate"
-  role   = "roles/storage.objectAdmin"
-  member = "serviceAccount:${google_service_account.deployer.email}"
-}
+# State-bucket access for the deployer is NOT managed here. The deployer can't read the
+# bucket's IAM policy, so OpenTofu running in CI can't refresh such a binding. `just ci-vars`
+# grants roles/storage.objectAdmin on the bucket with gcloud instead.
