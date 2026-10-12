@@ -1,0 +1,12 @@
+project_id        = "ticket-notifier-511415"
+region            = "europe-west4"
+github_repository = "OWNER/REPO"
+
+ntfy_topic = "tix-replace-with-long-random-string"
+
+google_client_id     = "xxxxxxxx.apps.googleusercontent.com"
+google_client_secret = "GOCSPX-..."
+google_refresh_token = "1//..."
+
+# Optional overrides (defaults already target Celebratix / SPIELRAUM WEEKENDER OCT)
+# subject = "SPIELRAUM WEEKENDER OCT"

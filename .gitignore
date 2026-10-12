@@ -1,0 +1,8 @@
+target/
+.env
+.terraform/
+*.tfstate
+*.tfstate.*
+terraform.tfvars
+*.auto.tfvars
+crash.log

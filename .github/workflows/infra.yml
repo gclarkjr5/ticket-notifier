@@ -1,0 +1,114 @@
+name: Infra
+
+# PRs: plan and comment the result. Push to main: build image, then apply.
+on:
+  pull_request:
+    paths: [infra/**, ticket-alert/**, .github/workflows/infra.yml]
+  push:
+    branches: [main]
+    paths: [infra/**, ticket-alert/**, .github/workflows/infra.yml]
+
+# Never run two applies at once, and never cancel one halfway.
+concurrency:
+  group: infra
+  cancel-in-progress: false
+
+env:
+  REGION: europe-west4
+  TF_IN_AUTOMATION: "true"
+  TF_INPUT: "false"
+  TF_VAR_github_repository: ${{ github.repository }}
+  TF_VAR_google_client_id: ${{ secrets.GOOGLE_CLIENT_ID }}
+  TF_VAR_google_client_secret: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+  TF_VAR_google_refresh_token: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
+  TF_VAR_ntfy_topic: ${{ secrets.NTFY_TOPIC }}
+  TF_VAR_image_tag: ${{ github.sha }}
+
+jobs:
+  plan:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version: 1.10.6
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOYER_SA }}
+      - name: Init
+        working-directory: infra
+        run: tofu init
+      - name: Plan
+        id: plan
+        working-directory: infra
+        run: |
+          set +e
+          tofu plan -no-color -lock-timeout=120s 2>&1 | tee plan.txt
+          echo "exit_code=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+      - name: Comment plan on PR
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let plan = fs.existsSync('infra/plan.txt') ? fs.readFileSync('infra/plan.txt', 'utf8') : '(no plan output)';
+            if (plan.length > 60000) plan = plan.slice(0, 60000) + '\n... truncated ...';
+            const failed = '${{ steps.plan.outputs.exit_code }}' !== '0';
+            const marker = '<!-- tofu-plan -->';
+            const body = `${marker}\n### OpenTofu plan ${failed ? '❌ failed' : '✅'}\n<details><summary>Show plan</summary>\n\n\`\`\`\n${plan}\n\`\`\`\n</details>\n\n_Applied automatically after merge to \`main\`._`;
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number });
+            const existing = comments.find(c => c.body && c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body });
+            }
+      - name: Fail if plan failed
+        if: steps.plan.outputs.exit_code != '0'
+        run: exit 1
+
+  deploy:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: production # add required reviewers in repo settings for a manual gate
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version: 1.10.6
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOYER_SA }}
+          token_format: access_token
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGION }}-docker.pkg.dev
+          username: oauth2accesstoken
+          password: ${{ steps.auth.outputs.access_token }}
+      - uses: docker/setup-buildx-action@v3
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: ticket-alert
+          push: true
+          tags: ${{ env.REGION }}-docker.pkg.dev/ticket-notifier-511415/ticket-alert/ticket-alert:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Apply
+        working-directory: infra
+        run: |
+          tofu init
+          tofu apply -auto-approve -lock-timeout=300s
