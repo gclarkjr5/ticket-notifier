@@ -6,3 +6,4 @@ target/
 terraform.tfvars
 *.auto.tfvars
 crash.log
+infra/plan.txt

@@ -14,7 +14,7 @@ Gmail ─watch→ Pub/Sub ─push (OIDC)→ Cloud Run: ticket-alert (Rust) ─�
 | `ticket-alert/` | the Rust service and its Dockerfile |
 | `infra/` | OpenTofu for all of GCP: APIs, registry, secrets, Cloud Run, Pub/Sub, Scheduler, IAM, GitHub OIDC |
 | `.github/workflows/` | CI (`ci.yml`) and plan/deploy (`infra.yml`) |
-| `justfile` | local commands; run `just` to list them (needs [just](https://just.systems)) |
+| `justfile` | every action, used by you and by CI; run `just` to list them (needs [just](https://just.systems)) |
 
 GCP project: `ticket-notifier-511415`. Region: `europe-west4`.
 
@@ -26,7 +26,7 @@ GCP project: `ticket-notifier-511415`. Region: `europe-west4`.
 5. Deploy the first time by hand:
    ```sh
    just bootstrap   # state bucket, APIs, image registry
-   just image       # Cloud Build builds and pushes the container
+   just image       # builds (linux/amd64) and pushes the container; needs Docker
    just deploy      # everything else (review the plan, type yes)
    just watch       # start the Gmail watch now
    ```
@@ -44,18 +44,24 @@ Auth is keyless (Workload Identity Federation limited to this repository); no JS
 Optional: in Settings → Environments → `production`, add yourself as a required reviewer to
 gate deploys.
 
-| workflow | when | does |
+**CI follows the justfile.** The workflows only install tools and authenticate; every action
+is a `just` recipe, so you can run exactly what CI runs on your laptop.
+
+| workflow | when | runs |
 |---|---|---|
-| `ci.yml` | every PR and push to `main` | `cargo fmt --check`, `clippy -D warnings`, tests; hadolint + Docker build; `tofu fmt -check` + `validate` |
-| `infra.yml` → plan | PR touching `infra/` or `ticket-alert/` | `tofu plan`, posted/updated as a PR comment |
-| `infra.yml` → deploy | merge to `main` | build + push image tagged with the commit SHA, then `tofu apply` |
+| `ci.yml` | every PR and push to `main` | `just lint-rust` (fmt, clippy `-D warnings`, tests), `just lint-docker docker-build` (hadolint + image build), `just lint-infra` (`tofu fmt -check` + `validate`) |
+| `infra.yml` → plan | PR touching `infra/`, `ticket-alert/` or the justfile | `just plan`, output posted/updated as a PR comment |
+| `infra.yml` → deploy | merge to `main` | `just image` (build + push, tagged with the commit SHA) then `just deploy -auto-approve` |
 | dependabot | weekly | Actions, cargo, Docker and provider updates |
+
+Locally: `just lint` = all of `ci.yml` (needs `docker` and `hadolint`: `brew install hadolint`),
+`just plan` previews a deploy, `just image deploy` ships one.
 
 Suggested branch protection on `main`: require the three `ci.yml` jobs and the plan job.
 
 ## Day to day
 - `just lint` runs the same checks as CI locally; `just fmt` fixes formatting.
-- Merge to `main` to deploy. `just image deploy` still works for a manual deploy.
+- Merge to `main` to deploy, or run `just image deploy` yourself; both use the same recipes.
 - `just logs` tails the service.
 
 ## Test the alert
