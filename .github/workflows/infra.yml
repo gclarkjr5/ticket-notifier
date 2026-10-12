@@ -36,7 +36,7 @@ jobs:
       pull-requests: write
     steps:
       - uses: actions/checkout@v4
-      - uses: extractions/setup-just@v2
+      - uses: extractions/setup-just@v4
       - uses: opentofu/setup-opentofu@v1
         with:
           tofu_version: 1.10.6
@@ -85,7 +85,7 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@v4
-      - uses: extractions/setup-just@v2
+      - uses: extractions/setup-just@v4
       - uses: opentofu/setup-opentofu@v1
         with:
           tofu_version: 1.10.6
