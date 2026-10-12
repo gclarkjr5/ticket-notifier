@@ -4,7 +4,7 @@ Get an instant phone alert, with the buy link, when Celebratix emails a resale t
 SPIELRAUM WEEKENDER OCT. You tap the notification and complete the purchase yourself.
 
 ```
-Gmail ─watch→ Pub/Sub ─push (OIDC)→ Cloud Run: ticket-alert (Rust) ─→ ntfy ─→ phone
+Gmail ─watch→ Pub/Sub ─push (OIDC)→ Cloud Run: ticket-alert (Rust) ─→ Pushover ─→ phone
                                           ↑
               Cloud Scheduler (daily /renew keeps the Gmail watch alive)
 ```
@@ -26,7 +26,7 @@ GCP project: `ticket-notifier-511415`. Region: `europe-west4`.
    3. **Audience → Test users → Add users**: add your own Gmail address. Leave the app in Testing.
    4. **Clients → Create client**: type **Web application**, authorized redirect URI `https://developers.google.com/oauthplayground`. Copy the client ID and secret.
    5. Open the [OAuth Playground](https://developers.google.com/oauthplayground), click the gear, tick **Use your own OAuth credentials**, paste the client ID and secret. In step 1 enter the scope `https://www.googleapis.com/auth/gmail.modify` and Authorize APIs. Choose your Gmail account; on the "Google hasn't verified this app" screen click Advanced → Go to ticket-notifier (unsafe), which is your own app. In step 2 click **Exchange authorization code for tokens** and copy the **refresh token**.
-3. Install **ntfy** on your phone, subscribe to a long random topic, and allow urgent notifications to override Do Not Disturb.
+3. Create a **Pushover** account, install the app, copy your *User Key*, and create an application at pushover.net/apps/build to get an *API token*. Alerts use emergency priority (breaks through Niet storen, repeats until acknowledged).
 4. `cp infra/terraform.tfvars.example infra/terraform.tfvars` and fill it in (git-ignored). `github_repository` is `OWNER/REPO` of this repo once you push it.
 5. Deploy the first time by hand:
    ```sh
@@ -43,7 +43,8 @@ just ci-vars     # sets the GCP_WORKLOAD_IDENTITY_PROVIDER and GCP_DEPLOYER_SA r
 gh secret set GOOGLE_CLIENT_ID
 gh secret set GOOGLE_CLIENT_SECRET
 gh secret set GOOGLE_REFRESH_TOKEN
-gh secret set NTFY_TOPIC
+gh secret set PUSHOVER_USER_KEY
+gh secret set PUSHOVER_APP_TOKEN
 ```
 Auth is keyless (Workload Identity Federation limited to this repository); no JSON keys.
 Until `just ci-vars` has set `GCP_WORKLOAD_IDENTITY_PROVIDER`, `infra.yml` skips its jobs and
@@ -72,7 +73,7 @@ Google expires the refresh token 7 days after you create it. Put a recurring rem
 1. In the OAuth Playground repeat step 5 above (your client ID/secret are still entered; Authorize APIs, Exchange authorization code for tokens) and copy the new refresh token.
 2. `just rotate-token` and paste it. This updates the GitHub secret and your local tfvars, then triggers the Infra workflow, which rolls out a new Cloud Run revision with the new token.
 
-If you forget, the service sends an urgent ntfy alert "Gmail auth FAILED" (at most hourly, and the daily watch-renewal job also trips it). Rotate as above; Pub/Sub keeps retrying, so any email that arrived meanwhile is picked up once the new revision is live. Emails received while the token is dead are not alerted until then, so rotate before the event rather than waiting for the alert.
+If you forget, the service sends an emergency Pushover alert "Gmail auth FAILED" (at most hourly, and the daily watch-renewal job also trips it). Rotate as above; Pub/Sub keeps retrying, so any email that arrived meanwhile is picked up once the new revision is live. Emails received while the token is dead are not alerted until then, so rotate before the event rather than waiting for the alert.
 
 ## Day to day
 - `just lint` runs the same checks as CI locally; `just fmt` fixes formatting.
@@ -85,7 +86,7 @@ mail yourself a message with a `https://shop.celebratix.io/resale/...` link, and
 phone buzzes within seconds. Set it back afterwards.
 
 ## Notes
-- OAuth secrets and the ntfy topic live in OpenTofu state (GCS bucket `ticket-notifier-511415-tfstate`, versioned, private) and in GitHub secrets.
+- OAuth secrets and the Pushover keys live in OpenTofu state (GCS bucket `ticket-notifier-511415-tfstate`, versioned, private) and in GitHub secrets.
 - The deployer service account holds admin roles on the services used here (see `infra/github.tf`). PR plans from forks get no cloud access; keep the repo private or restrict who can open PRs.
 - If a Celebratix button is a tracking redirect on another domain, you'll get a "no link matched" alert; adjust `link_pattern`.
 - The first apply can fail on the Pub/Sub token-creator binding if Google hasn't created the Pub/Sub service agent yet; rerun `just deploy`.

@@ -24,8 +24,8 @@ struct Config {
     sender: String,
     subject: Option<String>,
     link_pattern: Regex,
-    ntfy_server: String,
-    ntfy_topic: String,
+    pushover_user: String,
+    pushover_token: String,
     pubsub_topic: Option<String>,
 }
 
@@ -56,8 +56,8 @@ impl Config {
             sender: env("SENDER")?,
             subject: std::env::var("SUBJECT").ok().filter(|s| !s.is_empty()),
             link_pattern: Regex::new(&env("LINK_PATTERN")?).context("bad LINK_PATTERN")?,
-            ntfy_server: std::env::var("NTFY_SERVER").unwrap_or_else(|_| "https://ntfy.sh".into()),
-            ntfy_topic: env("NTFY_TOPIC")?,
+            pushover_user: env("PUSHOVER_USER_KEY")?,
+            pushover_token: env("PUSHOVER_APP_TOKEN")?,
             pubsub_topic: std::env::var("PUBSUB_TOPIC").ok(),
         })
     }
@@ -163,18 +163,29 @@ impl State {
         Ok(id)
     }
 
+    /// Sends a Pushover emergency-priority (2) message: bypasses Do Not Disturb and repeats
+    /// every 60s (for up to 10 minutes) until acknowledged. Tapping opens `click`.
     async fn notify(&self, title: &str, body: &str, click: Option<&str>) -> Result<()> {
-        let mut req = self
-            .http
-            .post(format!("{}/{}", self.cfg.ntfy_server, self.cfg.ntfy_topic))
-            .header("Title", title)
-            .header("Priority", "urgent")
-            .header("Tags", "ticket")
-            .body(body.to_string());
+        let mut form: Vec<(&str, &str)> = vec![
+            ("token", &self.cfg.pushover_token),
+            ("user", &self.cfg.pushover_user),
+            ("title", title),
+            ("message", body),
+            ("priority", "2"),
+            ("retry", "60"),
+            ("expire", "600"),
+            ("sound", "siren"),
+        ];
         if let Some(u) = click {
-            req = req.header("Click", u);
+            form.push(("url", u));
+            form.push(("url_title", "Open"));
         }
-        req.send().await?.error_for_status()?;
+        self.http
+            .post("https://api.pushover.net/1/messages.json")
+            .form(&form)
+            .send()
+            .await?
+            .error_for_status()?;
         Ok(())
     }
 

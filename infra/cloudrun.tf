@@ -41,14 +41,6 @@ resource "google_cloud_run_v2_service" "alert" {
         value = var.link_pattern
       }
       env {
-        name  = "NTFY_SERVER"
-        value = var.ntfy_server
-      }
-      env {
-        name  = "NTFY_TOPIC"
-        value = var.ntfy_topic
-      }
-      env {
         name  = "PUBSUB_TOPIC"
         value = google_pubsub_topic.gmail_push.id
       }

@@ -3,6 +3,8 @@ locals {
     GOOGLE_CLIENT_ID     = var.google_client_id
     GOOGLE_CLIENT_SECRET = var.google_client_secret
     GOOGLE_REFRESH_TOKEN = var.google_refresh_token
+    PUSHOVER_USER_KEY    = var.pushover_user_key
+    PUSHOVER_APP_TOKEN   = var.pushover_app_token
   }
 }
 

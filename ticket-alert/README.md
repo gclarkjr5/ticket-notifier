@@ -2,7 +2,7 @@
 
 Rust (axum) service. On every Pub/Sub push it searches Gmail for mail matching `SENDER` /
 `SUBJECT` that isn't yet labelled `ticket-notified`, extracts the first link matching
-`LINK_PATTERN`, sends an urgent ntfy notification (tapping it opens the link), then labels the
+`LINK_PATTERN`, sends an emergency-priority Pushover notification (tapping it opens the link), then labels the
 mail. The label is the only state, so retried or duplicate pushes can't double-notify.
 
 Endpoints: `POST /` (Pub/Sub push), `POST /renew` (re-register the Gmail watch),
@@ -15,7 +15,7 @@ Endpoints: `POST /` (Pub/Sub push), `POST /renew` (re-register the Gmail watch),
 | SENDER | Gmail `from:` value; display name or address (`Celebratix`) |
 | SUBJECT | optional Gmail `subject:` phrase (`SPIELRAUM WEEKENDER OCT`) |
 | LINK_PATTERN | regex the link must match |
-| NTFY_TOPIC / NTFY_SERVER | where alerts go (default server `https://ntfy.sh`) |
+| PUSHOVER_USER_KEY / PUSHOVER_APP_TOKEN | Pushover credentials (secrets) |
 | PUBSUB_TOPIC | `projects/<p>/topics/gmail-push`, used by `/renew` |
 
 ## Develop

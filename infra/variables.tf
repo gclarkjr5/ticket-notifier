@@ -39,15 +39,16 @@ variable "link_pattern" {
   default     = "^https://shop\\.celebratix\\.io/resale/[\\w-]+(/[\\w-]+)+"
 }
 
-variable "ntfy_topic" {
-  description = "ntfy topic name. Anyone who knows it can read your alerts, so make it long and random."
+variable "pushover_user_key" {
+  description = "Pushover user key (from the Pushover dashboard)"
   type        = string
   sensitive   = true
 }
 
-variable "ntfy_server" {
-  type    = string
-  default = "https://ntfy.sh"
+variable "pushover_app_token" {
+  description = "Pushover application API token"
+  type        = string
+  sensitive   = true
 }
 
 variable "watch_schedule" {

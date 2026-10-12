@@ -2,7 +2,8 @@ project_id        = "ticket-notifier-511415"
 region            = "europe-west4"
 github_repository = "OWNER/REPO"
 
-ntfy_topic = "tix-replace-with-long-random-string"
+pushover_user_key  = "u..."
+pushover_app_token = "a..."
 
 google_client_id     = "xxxxxxxx.apps.googleusercontent.com"
 google_client_secret = "GOCSPX-..."
