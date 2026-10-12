@@ -21,6 +21,11 @@ resource "google_cloud_run_v2_service" "alert" {
           cpu    = "1"
           memory = "256Mi"
         }
+
+        # CPU only while handling a request (all our work happens inside the request).
+        # Much cheaper than "always allocated", which also requires >= 512Mi.
+        cpu_idle          = true
+        startup_cpu_boost = true
       }
 
       env {
