@@ -26,9 +26,18 @@ env:
   TF_VAR_ntfy_topic: ${{ secrets.NTFY_TOPIC }}
 
 jobs:
+  # Visible (but not red) when the one-time setup hasn't been done yet.
+  not-configured:
+    name: infra workflow not configured yet
+    if: vars.GCP_WORKLOAD_IDENTITY_PROVIDER == ''
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "::warning title=Infra workflow skipped::GCP_WORKLOAD_IDENTITY_PROVIDER is not set. Do the first deploy locally, then run 'just ci-vars' (see README)."
+
   plan:
     name: just plan
-    if: github.event_name == 'pull_request'
+    # Dependabot PRs can't read Actions secrets, so a plan there would fail.
+    if: github.event_name == 'pull_request' && vars.GCP_WORKLOAD_IDENTITY_PROVIDER != '' && github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -77,7 +86,7 @@ jobs:
 
   deploy:
     name: just image deploy
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' && vars.GCP_WORKLOAD_IDENTITY_PROVIDER != ''
     runs-on: ubuntu-latest
     environment: production # add required reviewers in repo settings for a manual gate
     permissions:
@@ -95,5 +104,7 @@ jobs:
           workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ vars.GCP_DEPLOYER_SA }}
       - uses: google-github-actions/setup-gcloud@v2
-      - run: just image
-      - run: just deploy -auto-approve
+      - name: Build and push image to Artifact Registry (just image)
+        run: just image
+      - name: Deploy the new tag with OpenTofu (just deploy)
+        run: just deploy -auto-approve

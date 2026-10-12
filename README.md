@@ -41,6 +41,9 @@ gh secret set GOOGLE_REFRESH_TOKEN
 gh secret set NTFY_TOPIC
 ```
 Auth is keyless (Workload Identity Federation limited to this repository); no JSON keys.
+Until `just ci-vars` has set `GCP_WORKLOAD_IDENTITY_PROVIDER`, `infra.yml` skips its jobs and
+shows a warning instead of failing. Plans are also skipped on Dependabot PRs, which can't read
+Actions secrets.
 Optional: in Settings → Environments → `production`, add yourself as a required reviewer to
 gate deploys.
 

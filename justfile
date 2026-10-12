@@ -60,8 +60,12 @@ bootstrap:
 init:
     tofu -chdir=infra init -input=false
 
-# build (linux/amd64, what Cloud Run runs) and push the image for the current tag
-image:
+# refuse to build/deploy uncommitted code under a git-SHA tag (same tag => Cloud Run would keep the old image)
+_clean:
+    @[ -n "${TAG:-}" ] || [ -z "$(git status --porcelain)" ] || { echo "Uncommitted changes: commit first, or set TAG=<name> explicitly"; exit 1; }
+
+# build (linux/amd64, what Cloud Run runs) and push the image to Artifact Registry as :<tag>
+image: _clean
     gcloud auth configure-docker {{region}}-docker.pkg.dev --quiet
     docker buildx build --platform linux/amd64 -t {{image}} --push ticket-alert
 
@@ -70,7 +74,7 @@ plan: init
     tofu -chdir=infra plan -no-color -lock-timeout=120s -var image_tag={{tag}} 2>&1 | tee infra/plan.txt
 
 # apply all infra for the current tag. CI runs: just deploy -auto-approve
-deploy *args: init
+deploy *args: _clean init
     tofu -chdir=infra apply -lock-timeout=300s -var image_tag={{tag}} {{args}}
 
 # after the first deploy: point GitHub Actions at the deployer identity (needs `gh` logged in)
