@@ -84,6 +84,19 @@ ci-vars:
 
 # ---------------------------------------------------------------- operate
 
+# new Gmail refresh token (from the OAuth Playground): update GitHub secret + local tfvars, redeploy via CI
+rotate-token:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    read -rsp "New refresh token: " tok; echo
+    [ -n "$tok" ] || { echo "empty token"; exit 1; }
+    printf '%s' "$tok" | gh secret set GOOGLE_REFRESH_TOKEN
+    if [ -f infra/terraform.tfvars ]; then
+      sed -i.bak "s|^google_refresh_token.*|google_refresh_token = \"$tok\"|" infra/terraform.tfvars && rm infra/terraform.tfvars.bak
+    fi
+    gh workflow run infra.yml
+    echo "Redeploy started: gh run watch"
+
 # start the Gmail watch right now (the scheduler also renews it daily)
 watch:
     gcloud scheduler jobs run renew-gmail-watch --location {{region}} --project {{project}}

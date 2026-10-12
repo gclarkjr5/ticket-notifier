@@ -20,7 +20,12 @@ GCP project: `ticket-notifier-511415`. Region: `europe-west4`.
 
 ## One-time setup (from your laptop)
 1. `gcloud auth login && gcloud auth application-default login`; install OpenTofu, just, and optionally `gh`.
-2. **OAuth client** (console only): APIs & Services → OAuth consent screen (External, add yourself as test user, then **Publish app**; apps left in "Testing" expire the refresh token after 7 days) → Credentials → OAuth client ID (Desktop). Authorize once with scope `https://www.googleapis.com/auth/gmail.modify` (e.g. OAuth Playground with "Use your own OAuth credentials") and keep the refresh token.
+2. **Gmail OAuth** (Google Cloud console only, one time). The app stays in *Testing* mode (no publishing, branding or domain needed), which means Google expires the refresh token after **7 days**; see "Token rotation" below. First `gcloud services enable gmail.googleapis.com --project ticket-notifier-511415`, then in the console:
+   1. **Google Auth Platform → Get started**: app name `ticket-notifier`, your email as support and contact email, Audience **External**, accept the policy, Create.
+   2. **Data Access → Add or remove scopes**: add `https://www.googleapis.com/auth/gmail.modify` (paste it under "Manually add scopes" if it isn't listed), Update, Save.
+   3. **Audience → Test users → Add users**: add your own Gmail address. Leave the app in Testing.
+   4. **Clients → Create client**: type **Web application**, authorized redirect URI `https://developers.google.com/oauthplayground`. Copy the client ID and secret.
+   5. Open the [OAuth Playground](https://developers.google.com/oauthplayground), click the gear, tick **Use your own OAuth credentials**, paste the client ID and secret. In step 1 enter the scope `https://www.googleapis.com/auth/gmail.modify` and Authorize APIs. Choose your Gmail account; on the "Google hasn't verified this app" screen click Advanced → Go to ticket-notifier (unsafe), which is your own app. In step 2 click **Exchange authorization code for tokens** and copy the **refresh token**.
 3. Install **ntfy** on your phone, subscribe to a long random topic, and allow urgent notifications to override Do Not Disturb.
 4. `cp infra/terraform.tfvars.example infra/terraform.tfvars` and fill it in (git-ignored). `github_repository` is `OWNER/REPO` of this repo once you push it.
 5. Deploy the first time by hand:
@@ -61,6 +66,13 @@ Locally: `just lint` = all of `ci.yml` (needs `docker` and `hadolint`: `brew ins
 `just plan` previews a deploy, `just image deploy` ships one.
 
 Suggested branch protection on `main`: require the three `ci.yml` jobs and the plan job.
+
+## Token rotation (every ~6 days while the app is in Testing)
+Google expires the refresh token 7 days after you create it. Put a recurring reminder in your calendar, and:
+1. In the OAuth Playground repeat step 5 above (your client ID/secret are still entered; Authorize APIs, Exchange authorization code for tokens) and copy the new refresh token.
+2. `just rotate-token` and paste it. This updates the GitHub secret and your local tfvars, then triggers the Infra workflow, which rolls out a new Cloud Run revision with the new token.
+
+If you forget, the service sends an urgent ntfy alert "Gmail auth FAILED" (at most hourly, and the daily watch-renewal job also trips it). Rotate as above; Pub/Sub keeps retrying, so any email that arrived meanwhile is picked up once the new revision is live. Emails received while the token is dead are not alerted until then, so rotate before the event rather than waiting for the alert.
 
 ## Day to day
 - `just lint` runs the same checks as CI locally; `just fmt` fixes formatting.

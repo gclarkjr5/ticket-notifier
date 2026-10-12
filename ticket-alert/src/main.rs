@@ -40,6 +40,7 @@ struct State {
 struct Inner {
     token: Option<(String, Instant)>,
     label_id: Option<String>,
+    last_auth_alert: Option<Instant>,
 }
 
 fn env(k: &str) -> Result<String> {
@@ -90,6 +91,30 @@ impl State {
         let ttl = r["expires_in"].as_u64().unwrap_or(3600).saturating_sub(60);
         inner.token = Some((tok.clone(), Instant::now() + Duration::from_secs(ttl)));
         Ok(tok)
+    }
+
+    /// Like `access_token`, but tells you on your phone when Gmail auth is broken
+    /// (usually an expired refresh token), at most once an hour.
+    async fn token_or_alert(&self, inner: &mut Inner) -> Result<String> {
+        match self.access_token(inner).await {
+            Ok(t) => Ok(t),
+            Err(e) => {
+                let due = inner
+                    .last_auth_alert
+                    .is_none_or(|t| t.elapsed() > Duration::from_secs(3600));
+                if due {
+                    inner.last_auth_alert = Some(Instant::now());
+                    let _ = self
+                        .notify(
+                            "Ticket alerts: Gmail auth FAILED",
+                            "The refresh token has probably expired. Create a new one in the OAuth Playground, then run: just rotate-token",
+                            None,
+                        )
+                        .await;
+                }
+                Err(e)
+            }
+        }
     }
 
     async fn get(&self, tok: &str, url: &str, q: &[(&str, &str)]) -> Result<Value> {
@@ -156,7 +181,7 @@ impl State {
     /// Find unprocessed mail from SENDER, notify with the resale link, then label it done.
     async fn process(&self) -> Result<usize> {
         let mut inner = self.inner.lock().await;
-        let tok = self.access_token(&mut inner).await?;
+        let tok = self.token_or_alert(&mut inner).await?;
         let label_id = self.ensure_label(&tok, &mut inner).await?;
 
         let mut q = format!(
@@ -229,7 +254,7 @@ impl State {
             .clone()
             .ok_or_else(|| anyhow!("PUBSUB_TOPIC not set"))?;
         let mut inner = self.inner.lock().await;
-        let tok = self.access_token(&mut inner).await?;
+        let tok = self.token_or_alert(&mut inner).await?;
         Ok(self.http.post(format!("{GMAIL}/watch")).bearer_auth(&tok)
             .json(&json!({"topicName": topic, "labelIds": ["INBOX"], "labelFilterBehavior": "INCLUDE"}))
             .send().await?.error_for_status()?.json().await?)

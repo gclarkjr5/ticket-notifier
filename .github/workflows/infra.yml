@@ -3,6 +3,7 @@ name: Infra
 # Thin wrapper: authenticate, then call the same `just` recipes you run locally.
 # PRs: `just plan` and comment the result. Push to main: `just image` then `just deploy`.
 on:
+  workflow_dispatch: # manual run, e.g. after rotating the Gmail refresh token (`just rotate-token`)
   pull_request:
     paths: [infra/**, ticket-alert/**, justfile, .github/workflows/infra.yml]
   push:
@@ -86,7 +87,7 @@ jobs:
 
   deploy:
     name: just image deploy
-    if: github.event_name == 'push' && vars.GCP_WORKLOAD_IDENTITY_PROVIDER != ''
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && vars.GCP_WORKLOAD_IDENTITY_PROVIDER != ''
     runs-on: ubuntu-latest
     environment: production # add required reviewers in repo settings for a manual gate
     permissions:

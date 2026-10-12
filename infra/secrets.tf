@@ -21,4 +21,9 @@ resource "google_secret_manager_secret_version" "oauth" {
   for_each    = toset(keys(local.secrets))
   secret      = google_secret_manager_secret.oauth[each.value].id
   secret_data = local.secrets[each.value]
+
+  # New version first, so Cloud Run can move to it before the old one is destroyed.
+  lifecycle {
+    create_before_destroy = true
+  }
 }
