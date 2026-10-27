@@ -4,6 +4,8 @@ Rust (axum) service. On every Pub/Sub push it searches Gmail for mail matching `
 `SUBJECT` that isn't yet labelled `ticket-notified`, extracts the first link matching
 `LINK_PATTERN`, sends an emergency-priority Pushover notification (tapping it opens the link), then labels the
 mail. The label is the only state, so retried or duplicate pushes can't double-notify.
+Only mail from the last day (`newer_than:1d`) is considered. Pushover errors and Gmail auth
+errors return HTTP 500, so Pub/Sub retries the push.
 
 Endpoints: `POST /` (Pub/Sub push), `POST /renew` (re-register the Gmail watch),
 `GET /healthz`. Both POSTs expect Cloud Run IAM auth (handled by the infra).
